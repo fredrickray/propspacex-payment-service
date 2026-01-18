@@ -96,3 +96,102 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## Databse Design/Schema
+[See visualization](https://mermaid.live/edit#pako:eNqtVltT6jAQ_iudPKPDRUD7hrXnHEdEB3QczzCTSckKObZJJ03RCvz3kxRLhbaKlz61e8vut99us0ATQQHZCOQZI1NJgjEfc0s_zu1w6A6cc3dkLZcHB2Jh3fX6ffdmZNlWFIehkCqqsrzu3V-6g9Q0joBiL6mydEfO8OrOGFLgImCcKKgM23fPfrtDrCMPjdS2JEyEpJX2d-c3f86GPZ23MX5iakYleYow41mRWUnGYbl8_cQjV8c6v7k3lcIklllG5danvX5v4LhrXIKASPZS5lCW_4yUG-aozIRPy222i2OcKbbGbm192htc4J7jXN0Oqnw0esDmucsbABdriXkiJRmfWoYm1vVFQc5JAAVhlASe8HMx48qC51Bw4CqXekL4QLgFnHg-0LVitduaxXYYRreyMKI5cCokZrSYdCwl8EmC0-x_FbOPFFFxlIsVC0DLgtCaSNBwUkxUaV45R3byeyK-DwqnadbKjgwZx7rvs7JD45CWH7oZqI_RCEkCEuux20YkVUkRglTJ56AyniQQ8dvWZbVIMWcUZKUCS3gAExc-hP5fJLilxxNvfHUlviB0n-7sCWM2V3tzKu_mLiI_jmU1Fc0OwNqF-Z8i6s62-bjm8mK_UxNlescoJnhBoxeBTLBKwiIxNpTZUZtzch2jX5naza7ee2qNVglFfOwRn2wROS18Tphv1ldRvQcft5f0dzZd5SR6hD-mPSvXlK5vMpmYdmIeB56eQ423TEIFtNLQJ5E6qg5TdsZ7GyL7McxBsgcGn-z0m3_cVzlvNCk8WQk_OBM_uTPfhQPV0FQyimwlY6ihAGRAzCdKURkjNQPdF2TrV0rk4xiN-Ur7hIT_FSLI3KSIpzNkPxA_0l9rJr_eFDcmmpUgHVMtsjutVhoD2Qv0jOzjk8N6o9lsH9WPWifNZqOGEmS3m4eteqvTaLYax81ut9tY1dBLemb9sNttd-v1drvb6Zx02o12DQFlSsjL9TU1va2u_gMFgUnP)
+
+Without the visualization, here it is:
+
+```pgsql
+Entity currencies {
+  code : char(3) PK
+  name : text
+  symbol : text
+  exponent : smallint
+  enabled : boolean
+}
+
+Entity wallets {
+  id : bigint PK
+  vendor_id : bigint UNIQUE
+  currency_code : char(3) FK
+  status : text
+  created_at : timestamptz
+}
+
+Entity wallet_security {
+  wallet_id : bigint PK, FK
+  pin_hash : text
+  updated_at : timestamptz
+}
+
+Entity payments {
+  id : bigint PK
+  payer_user_id : bigint
+  property_id : bigint
+  currency_code : char(3) FK
+  amount : bigint
+  provider : text
+  provider_reference : text UNIQUE
+  status : text
+  raw_provider_payload : jsonb
+  created_at : timestamptz
+  updated_at : timestamptz
+}
+
+Entity escrows {
+  id : bigint PK
+  vendor_wallet_id : bigint FK
+  property_id : bigint
+  currency_code : char(3) FK
+  amount : bigint
+  status : text
+  hold_until : timestamptz
+  created_at : timestamptz
+}
+
+Entity ledger_entries {
+  id : bigint PK
+  wallet_id : bigint FK
+  currency_code : char(3) FK
+  amount : bigint
+  direction : text
+  entry_type : text
+  reference_type : text
+  reference_id : bigint
+  created_at : timestamptz
+}
+
+Entity wallet_balances {
+  wallet_id : bigint PK, FK
+  total_balance : bigint
+  available_balance : bigint
+  updated_at : timestamptz
+}
+
+Entity bank_accounts {
+  id : bigint PK
+  vendor_id : bigint
+  provider : text
+  bank_code : text
+  bank_name : text
+  account_number_encrypted : text
+  account_last4 : char(4)
+  account_name : text
+  provider_reference : text UNIQUE
+  verified : boolean
+  created_at : timestamptz
+}
+
+Entity withdrawals {
+  id : bigint PK
+  wallet_id : bigint FK
+  bank_account_id : bigint FK
+  currency_code : char(3) FK
+  amount : bigint
+  provider : text
+  provider_reference : text UNIQUE
+  status : text
+  created_at : timestamptz
+}
+```
