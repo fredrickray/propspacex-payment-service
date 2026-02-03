@@ -1,8 +1,9 @@
+import { AllExceptionsFilter } from '@/common/filters/all-exceptions.filter';
+import { showStartupBanner } from '@/common/utils/startup-banner';
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { Logger, ValidationPipe } from '@nestjs/common';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { showStartupBanner } from '@common/utils/startup-banner';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -12,15 +13,19 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
   );
-  const port = process.env.PORT ?? 3000;
-  await app.listen(port);
+  await ConfigModule.envVariablesLoaded;
+
+  const configService = app.get(ConfigService);
+
+  await app.listen(configService.get('app.port') as number);
 
   showStartupBanner({
-    appName: 'PropSpaceX Payment Service',
-    port,
-    environment: process.env.NODE_ENV,
+    appName: configService.get('app.name'),
+    port: configService.get('app.port') as number,
+    environment: configService.get('app.environment'),
   });
 }
+
 bootstrap().catch((err) => {
   Logger.error('Error during application bootstrap:', err);
   process.exit(1);

@@ -15,11 +15,7 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "paths": {
-      "@database/*": ["src/database/*"],
-      "@common/*": ["src/common/*"],
-      "@integration/*": ["src/integrations/*"],
-      "@jobs/*": ["src/jobs/*"],
-      "@modules/*": ["src/modules/*"]
+      "@/*": ["src/*"]
     },
     "incremental": true,
     "skipLibCheck": true,
