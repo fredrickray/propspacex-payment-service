@@ -2,10 +2,6 @@
   "extends": "./tsconfig.json",
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"],
   "paths": {
-    "@database/*": ["src/database/*"],
-    "@common/*": ["src/common/*"],
-    "@integration/*": ["src/integrations/*"],
-    "@jobs/*": ["src/jobs/*"],
-    "@modules/*": ["src/modules/*"]
+    "@/*": ["src/*"]
   }
 }
