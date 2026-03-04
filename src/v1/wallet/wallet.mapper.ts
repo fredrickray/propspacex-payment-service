@@ -10,8 +10,8 @@ export class WalletMapper {
       totalBalance: wallet.totalBalance,
       availableBalance: wallet.availableBalance,
       status: wallet.status,
-      createdAt: wallet.createdAt.toISOString(),
-      updatedAt: wallet.updatedAt?.toISOString() ?? undefined,
+      createdAt: wallet.createdAt,
+      updatedAt: wallet.updatedAt ?? undefined,
       currency: wallet.currency ? CurrencyMapper.toResponse(wallet.currency) : undefined,
     }
   }

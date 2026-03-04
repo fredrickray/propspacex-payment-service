@@ -5,7 +5,7 @@ import { DRIZZLE_SERVICE_TAG } from '@/drizzle/drizzle.definition';
 import { seedDefaultData } from '@/seeds';
 import { WALLET_PACKAGE_NAME } from '@/v1/wallet/wallet';
 import { ReflectionService } from '@grpc/reflection';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
@@ -27,12 +27,14 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
+  const { host, walletServicePort, paymentServicePort, webhookServicePort, environment } = configService.get('app') as Record<string, string>;
+
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
       package: [WALLET_PACKAGE_NAME],
       protoPath: [join(__dirname, 'v1/wallet/wallet.proto')],
-      url: `${configService.get('app.host')}:${configService.get('app.port')}`,
+      url: `${host}:${walletServicePort}`,
       onLoadPackageDefinition: (pkg, server) => {
         new ReflectionService(pkg).addToServer(server);
       },
@@ -51,10 +53,24 @@ async function bootstrap() {
   await seedDefaultData(db);
   await app.startAllMicroservices();
 
+  app.setGlobalPrefix('/api')
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
+
+  Logger.log(host, walletServicePort, paymentServicePort, webhookServicePort, environment);
+
+  // this is for the http server for the webhooks. The webhook server cannot listen on the same ports as the other microservices.
+  await app.listen(webhookServicePort);
+
   showStartupBanner({
     appName: configService.get('app.name'),
-    port: configService.get('app.port') as number,
-    environment: configService.get('app.environment'),
+    walletServicePort,
+    webhookServicePort,
+    paymentServicePort,
+    environment,
+    host: host,
   });
 }
 
