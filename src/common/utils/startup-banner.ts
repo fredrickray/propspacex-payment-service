@@ -2,7 +2,9 @@ import { Logger } from '@nestjs/common';
 
 interface StartupBannerOptions {
   appName?: string;
-  port: number | string;
+  walletServicePort: number | string;
+  webhookServicePort: number | string;
+  paymentServicePort: number | string;
   environment?: string;
   host?: string;
 }
@@ -10,12 +12,16 @@ interface StartupBannerOptions {
 export function showStartupBanner(options: StartupBannerOptions): void {
   const {
     appName = 'PropSpaceX Payment Service',
-    port,
+    walletServicePort,
+    webhookServicePort,
+    paymentServicePort,
     environment = 'development',
     host = 'localhost',
   } = options;
 
-  const url = `http://${host}:${port}`;
+  const walletUrl = `http://${host}:${walletServicePort}`;
+  const webhookUrl = `http://${host}:${webhookServicePort}`;
+  const paymentUrl = `http://${host}:${paymentServicePort}`;
 
   Logger.log('=================================================');
   Logger.log(` 🚀 ${appName} is live and ready for action`);
@@ -27,7 +33,9 @@ export function showStartupBanner(options: StartupBannerOptions): void {
   Logger.log('     |       |');
   Logger.log('  [====]   [====]');
   Logger.log(` 🌍 Environment : ${environment}`);
-  Logger.log(` 🔗 Listening on: ${url}`);
+  Logger.log(` 🔗 Wallet Service on: ${walletUrl}`);
+  Logger.log(` 🔗 Webhook Server on: ${webhookUrl}`);
+  Logger.log(` 🔗 Payment Service on: ${paymentUrl}`);
   Logger.log('PropSpaceX: Trustless, transparent transactions!');
   Logger.log('=================================================');
 }

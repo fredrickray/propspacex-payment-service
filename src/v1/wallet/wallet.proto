@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package wallet;
+
+service WalletService {
+  rpc CreateWallet (CreateWalletReq) returns (CreateWalletRes) {}
+  rpc GetWalletByUserId (GetWalletByUserIdReq) returns (WalletResponseType) {}
+  rpc GetWalletById (GetWalletByIdReq) returns (WalletResponseType) {}
+}
+
+message CreateWalletReq {
+  string userId = 1;
+  string currency = 2;
+}
+
+message Currency {
+  string code = 1;
+  string name = 2;
+  string symbol = 3;
+}
+
+message CreateWalletRes {
+  int32 id = 1;
+  string userId = 2;
+  Currency currency = 3;
+}
+
+message WalletResponseType {
+  int32 id = 1;
+  string userId = 2;
+  int32 totalBalance = 3;
+  int32 availableBalance = 4;
+  string status = 5;
+  string createdAt = 6;
+  optional string updatedAt = 7;
+  optional Currency currency = 8;
+}
+
+message GetWalletByUserIdReq {
+  string userId = 1;
+}
+
+message GetWalletByIdReq {
+  int32 walletId = 1;
+}
