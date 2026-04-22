@@ -3,7 +3,6 @@ import { showStartupBanner } from '@/common/utils/startup-banner';
 import { DrizzleDatabaseType } from '@/database/types';
 import { DRIZZLE_SERVICE_TAG } from '@/drizzle/drizzle.definition';
 import { seedDefaultData } from '@/seeds';
-import { WALLET_PACKAGE_NAME } from '@/v1/wallet/wallet';
 import { ReflectionService } from '@grpc/reflection';
 import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -14,6 +13,9 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  const PAYMENT_PACKAGE_NAME = 'payment';
+  const PAYMENT_PROTO_PATH = join(process.cwd(), 'proto', 'payment', 'v1', 'payment.proto');
+
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn', 'debug', 'verbose']
   });
@@ -27,14 +29,14 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  const { host, walletServicePort, paymentServicePort, webhookServicePort, environment } = configService.get('app') as Record<string, string>;
+  const { host, grpcPort, paymentServicePort, environment } = configService.get('app') as Record<string, string>;
 
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
-      package: [WALLET_PACKAGE_NAME],
-      protoPath: [join(__dirname, 'v1/wallet/wallet.proto')],
-      url: `${host}:${walletServicePort}`,
+      package: [PAYMENT_PACKAGE_NAME],
+      protoPath: [PAYMENT_PROTO_PATH],
+      url: `${host}:${grpcPort}`,
       onLoadPackageDefinition: (pkg, server) => {
         new ReflectionService(pkg).addToServer(server);
       },
@@ -59,15 +61,12 @@ async function bootstrap() {
     defaultVersion: '1',
   });
 
-  Logger.log(host, walletServicePort, paymentServicePort, webhookServicePort, environment);
-
-  // this is for the http server for the webhooks. The webhook server cannot listen on the same ports as the other microservices.
-  await app.listen(webhookServicePort);
+  // this is for the http server for the webhooks. The webhook server cannot listen on the same port as the gRPC microservice.
+  await app.listen(paymentServicePort);
 
   showStartupBanner({
     appName: configService.get('app.name'),
-    walletServicePort,
-    webhookServicePort,
+    grpcPort,
     paymentServicePort,
     environment,
     host: host,
