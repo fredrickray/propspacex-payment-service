@@ -11,12 +11,14 @@ export const walletsTable = pgTable('wallets', {
   status: varchar('status', { length: 20 }).default('active').notNull(),
   totalBalance: bigint('total_balance', { mode: 'number' }).default(sql`0`).notNull(),
   availableBalance: bigint('available_balance', { mode: 'number' }).default(sql`0`).notNull(),
+  heldBalance: bigint('held_balance', { mode: 'number' }).default(sql`0`).notNull(),
   createdAt: createdAtColumn,
   updatedAt: updatedAtColumn,
 }, (t) => [
   check('status', sql`${t.status} IN ('active', 'frozen', 'closed')`),
   check('totalBalance', sql`${t.totalBalance} >= 0`),
   check('availableBalance', sql`${t.availableBalance} >= 0`),
+  check('heldBalance', sql`${t.heldBalance} >= 0`),
 ])
 
 export const walletRelations = relations(walletsTable, ({ one }) => ({
