@@ -12,6 +12,8 @@ export const appConfig = registerAs('app', () => ({
   paymentServicePort: +(process.env.PAYMENT_SERVICE_PORT || 9093),
   environment: process.env.NODE_ENV,
   frontendBaseUrl: process.env.FRONTEND_BASE_URL,
+  /** UUID of a wallet user that accrues platform_fee_minor on escrow release (optional). */
+  platformWalletUserId: process.env.PLATFORM_WALLET_USER_ID,
 }))
 
 export const paystackConfig = registerAs('paystack', () => ({
@@ -22,4 +24,4 @@ export type AppConfigType = {
   db: ReturnType<typeof dbConfig>;
   app: ReturnType<typeof appConfig>;
   paystack: ReturnType<typeof paystackConfig>;
-}
+};

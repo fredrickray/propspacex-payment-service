@@ -23,6 +23,9 @@ import type {
 import { Inject, Injectable } from "@nestjs/common";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 
+/** DB handle used for atomic escrow/payment flows (root client or Drizzle transaction). */
+export type WalletDb = DrizzleDatabaseType;
+
 @Injectable()
 export class WalletService {
   constructor(@Inject(DRIZZLE_SERVICE_TAG) private drizzleClient: DrizzleDatabaseType) { }
@@ -371,5 +374,304 @@ export class WalletService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  // ===========================
+  // Ledger helpers (non-gRPC): used inside Drizzle transactions for escrow/payment.
+  // Not exposed over gRPC — keeps WalletService RPC behavior unchanged.
+  // ===========================
+
+  /** Credit buyer available + total (e.g. provider settlement recorded on-ledger). */
+  async ledgerCreditAvailable(
+    db: WalletDb,
+    params: { userId: string; amountMinor: number; referenceType: string; referenceId: string; entryType: string; note?: string },
+  ): Promise<void> {
+    const amount = Math.abs(params.amountMinor);
+    const wallet = await db.query.walletsTable.findFirst({
+      where: eq(walletsTable.userId, params.userId),
+    });
+    if (!wallet) {
+      throw new RpcNotFoundError('Wallet not found');
+    }
+    await db
+      .update(walletsTable)
+      .set({
+        totalBalance: sql`${walletsTable.totalBalance} + ${amount}`,
+        availableBalance: sql`${walletsTable.availableBalance} + ${amount}`,
+      })
+      .where(eq(walletsTable.id, wallet.id));
+
+    await db.insert(transactionsTable).values({
+      walletId: wallet.id,
+      userId: params.userId,
+      amountMinor: amount,
+      direction: 'credit',
+      entryType: params.entryType,
+      referenceType: params.referenceType,
+      referenceId: params.referenceId,
+      note: params.note ?? null,
+      status: 'completed',
+    });
+  }
+
+  /** Move funds from available → held for an escrow (buyer wallet). */
+  async ledgerHoldAvailableForEscrow(
+    db: WalletDb,
+    params: { userId: string; amountMinor: number; escrowId: string; note?: string },
+  ): Promise<void> {
+    const amount = Math.abs(params.amountMinor);
+    const wallet = await db.query.walletsTable.findFirst({
+      where: eq(walletsTable.userId, params.userId),
+    });
+    if (!wallet) {
+      throw new RpcNotFoundError('Wallet not found');
+    }
+    if (wallet.availableBalance < amount) {
+      throw new RpcPreconditionFailedError('Insufficient available balance for escrow hold');
+    }
+    await db
+      .update(walletsTable)
+      .set({
+        availableBalance: sql`${walletsTable.availableBalance} - ${amount}`,
+        heldBalance: sql`${walletsTable.heldBalance} + ${amount}`,
+      })
+      .where(eq(walletsTable.id, wallet.id));
+
+    await db.insert(transactionsTable).values({
+      walletId: wallet.id,
+      userId: params.userId,
+      amountMinor: amount,
+      direction: 'hold',
+      entryType: 'escrow_hold',
+      referenceType: 'escrow',
+      referenceId: params.escrowId,
+      note: params.note ?? null,
+      status: 'completed',
+    });
+  }
+
+  /** Release buyer held back to available (cancel / refund while disputed path). */
+  async ledgerRefundHeldToAvailable(
+    db: WalletDb,
+    params: { userId: string; amountMinor: number; escrowId: string; note?: string },
+  ): Promise<void> {
+    const amount = Math.abs(params.amountMinor);
+    const wallet = await db.query.walletsTable.findFirst({
+      where: eq(walletsTable.userId, params.userId),
+    });
+    if (!wallet) {
+      throw new RpcNotFoundError('Wallet not found');
+    }
+    if (wallet.heldBalance < amount) {
+      throw new RpcPreconditionFailedError('Insufficient held balance for refund');
+    }
+    await db
+      .update(walletsTable)
+      .set({
+        heldBalance: sql`${walletsTable.heldBalance} - ${amount}`,
+        availableBalance: sql`${walletsTable.availableBalance} + ${amount}`,
+      })
+      .where(eq(walletsTable.id, wallet.id));
+
+    await db.insert(transactionsTable).values({
+      walletId: wallet.id,
+      userId: params.userId,
+      amountMinor: amount,
+      direction: 'release',
+      entryType: 'refund',
+      referenceType: 'escrow',
+      referenceId: params.escrowId,
+      note: params.note ?? null,
+      status: 'completed',
+    });
+  }
+
+  /**
+   * Consume buyer held escrow amount: reduce buyer held + total, credit agent and optional platform wallets.
+   * Assumption: escrowAmountMinor == platformFeeMinor + netToAgentMinor (validated by caller).
+   */
+  async ledgerDisburseReleasedEscrow(
+    db: WalletDb,
+    params: {
+      buyerUserId: string;
+      agentUserId: string;
+      platformUserId: string | null;
+      escrowAmountMinor: number;
+      platformFeeMinor: number;
+      netToAgentMinor: number;
+      escrowId: string;
+      note?: string;
+    },
+  ): Promise<void> {
+    const totalOut = Math.abs(params.escrowAmountMinor);
+    const fee = Math.abs(params.platformFeeMinor);
+    const net = Math.abs(params.netToAgentMinor);
+    if (fee + net !== totalOut) {
+      throw new RpcPreconditionFailedError('Escrow disburse amounts must sum to escrow total');
+    }
+    if (fee > 0 && !params.platformUserId) {
+      throw new RpcPreconditionFailedError(
+        'Platform wallet user is not configured but escrow has a platform fee',
+      );
+    }
+
+    const buyerWallet = await db.query.walletsTable.findFirst({
+      where: eq(walletsTable.userId, params.buyerUserId),
+    });
+    const agentWallet = await db.query.walletsTable.findFirst({
+      where: eq(walletsTable.userId, params.agentUserId),
+    });
+    if (!buyerWallet) {
+      throw new RpcNotFoundError('Buyer wallet not found');
+    }
+    if (!agentWallet) {
+      throw new RpcNotFoundError('Agent wallet not found');
+    }
+    if (buyerWallet.heldBalance < totalOut) {
+      throw new RpcPreconditionFailedError('Insufficient held balance for escrow release');
+    }
+
+    await db
+      .update(walletsTable)
+      .set({
+        heldBalance: sql`${walletsTable.heldBalance} - ${totalOut}`,
+        totalBalance: sql`${walletsTable.totalBalance} - ${totalOut}`,
+      })
+      .where(eq(walletsTable.id, buyerWallet.id));
+
+    await db.insert(transactionsTable).values({
+      walletId: buyerWallet.id,
+      userId: params.buyerUserId,
+      amountMinor: totalOut,
+      direction: 'debit',
+      entryType: 'escrow_release',
+      referenceType: 'escrow',
+      referenceId: params.escrowId,
+      note: params.note ?? 'Escrow released to agent/platform',
+      status: 'completed',
+    });
+
+    await db
+      .update(walletsTable)
+      .set({
+        totalBalance: sql`${walletsTable.totalBalance} + ${net}`,
+        availableBalance: sql`${walletsTable.availableBalance} + ${net}`,
+      })
+      .where(eq(walletsTable.id, agentWallet.id));
+
+    await db.insert(transactionsTable).values({
+      walletId: agentWallet.id,
+      userId: params.agentUserId,
+      amountMinor: net,
+      direction: 'credit',
+      entryType: 'escrow_release',
+      referenceType: 'escrow',
+      referenceId: params.escrowId,
+      note: params.note ?? 'Escrow net credited to agent',
+      status: 'completed',
+    });
+
+    if (fee > 0 && params.platformUserId) {
+      const platformWallet = await db.query.walletsTable.findFirst({
+        where: eq(walletsTable.userId, params.platformUserId),
+      });
+      if (!platformWallet) {
+        throw new RpcNotFoundError('Platform wallet not found');
+      }
+      await db
+        .update(walletsTable)
+        .set({
+          totalBalance: sql`${walletsTable.totalBalance} + ${fee}`,
+          availableBalance: sql`${walletsTable.availableBalance} + ${fee}`,
+        })
+        .where(eq(walletsTable.id, platformWallet.id));
+
+      await db.insert(transactionsTable).values({
+        walletId: platformWallet.id,
+        userId: params.platformUserId,
+        amountMinor: fee,
+        direction: 'credit',
+        entryType: 'escrow_release',
+        referenceType: 'escrow',
+        referenceId: params.escrowId,
+        note: 'Platform fee from escrow release',
+        status: 'completed',
+      });
+    }
+  }
+
+  /** Credit available+total for a user (partial disbursement, e.g. dispute split to buyer). */
+  async ledgerCreditAvailableSimple(
+    db: WalletDb,
+    params: { userId: string; amountMinor: number; escrowId: string; entryType: string; note?: string },
+  ): Promise<void> {
+    const amount = Math.abs(params.amountMinor);
+    if (amount === 0) {
+      return;
+    }
+    const wallet = await db.query.walletsTable.findFirst({
+      where: eq(walletsTable.userId, params.userId),
+    });
+    if (!wallet) {
+      throw new RpcNotFoundError('Wallet not found');
+    }
+    await db
+      .update(walletsTable)
+      .set({
+        totalBalance: sql`${walletsTable.totalBalance} + ${amount}`,
+        availableBalance: sql`${walletsTable.availableBalance} + ${amount}`,
+      })
+      .where(eq(walletsTable.id, wallet.id));
+
+    await db.insert(transactionsTable).values({
+      walletId: wallet.id,
+      userId: params.userId,
+      amountMinor: amount,
+      direction: 'credit',
+      entryType: params.entryType,
+      referenceType: 'escrow',
+      referenceId: params.escrowId,
+      note: params.note ?? null,
+      status: 'completed',
+    });
+  }
+
+  /**
+   * Reduce buyer held (and total) by amount without crediting counterparties — caller credits splits.
+   * Used for dispute resolution where awards are credited separately.
+   */
+  async ledgerConsumeBuyerHeld(
+    db: WalletDb,
+    params: { buyerUserId: string; amountMinor: number; escrowId: string; note?: string },
+  ): Promise<void> {
+    const amount = Math.abs(params.amountMinor);
+    const wallet = await db.query.walletsTable.findFirst({
+      where: eq(walletsTable.userId, params.buyerUserId),
+    });
+    if (!wallet) {
+      throw new RpcNotFoundError('Buyer wallet not found');
+    }
+    if (wallet.heldBalance < amount) {
+      throw new RpcPreconditionFailedError('Insufficient held balance');
+    }
+    await db
+      .update(walletsTable)
+      .set({
+        heldBalance: sql`${walletsTable.heldBalance} - ${amount}`,
+        totalBalance: sql`${walletsTable.totalBalance} - ${amount}`,
+      })
+      .where(eq(walletsTable.id, wallet.id));
+
+    await db.insert(transactionsTable).values({
+      walletId: wallet.id,
+      userId: params.buyerUserId,
+      amountMinor: amount,
+      direction: 'debit',
+      entryType: 'escrow_release',
+      referenceType: 'escrow',
+      referenceId: params.escrowId,
+      note: params.note ?? null,
+      status: 'completed',
+    });
   }
 }
