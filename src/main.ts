@@ -17,7 +17,8 @@ async function bootstrap() {
   const PAYMENT_PROTO_PATH = join(process.cwd(), 'proto', 'payment', 'v1', 'payment.proto');
 
   const app = await NestFactory.create(AppModule, {
-    logger: ['log', 'error', 'warn', 'debug', 'verbose']
+    logger: ['log', 'error', 'warn', 'debug', 'verbose'],
+    rawBody: true,
   });
 
   await ConfigModule.envVariablesLoaded;
@@ -37,6 +38,11 @@ async function bootstrap() {
       package: [PAYMENT_PACKAGE_NAME],
       protoPath: [PAYMENT_PROTO_PATH],
       url: `${host}:${grpcPort}`,
+      loader: {
+        longs: String,
+        defaults: true,
+        oneofs: true,
+      },
       onLoadPackageDefinition: (pkg, server) => {
         new ReflectionService(pkg).addToServer(server);
       },

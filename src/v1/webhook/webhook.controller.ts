@@ -1,16 +1,29 @@
-import { Body, Controller, Headers, Post, Query } from "@nestjs/common";
+import { PaymentService } from "@/v1/payment/payment.service";
+import { Body, Controller, Headers, HttpCode, Post, Req } from "@nestjs/common";
+import { Request } from "express";
 
 @Controller({
   path: 'webhooks',
   version: '1',
 })
 export class WebhookController {
-  constructor() { }
+  constructor(private readonly paymentService: PaymentService) { }
 
   @Post('/paystack')
-  async handlePaystackWebhook(@Headers() headers: Headers, @Body() body: unknown, @Query() query: Record<string, unknown>) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    console.log(body, headers, query);
-    return { message: 'Webhook received' };
+  @HttpCode(200)
+  async handlePaystackWebhook(
+    @Req() req: Request & { rawBody?: Buffer },
+    @Headers('x-paystack-signature') signature: string,
+    @Body() body: unknown,
+  ) {
+    const payloadJson = req.rawBody?.toString('utf8') ?? JSON.stringify(body ?? {});
+    const event = typeof body === 'object' && body && 'event' in body ? String((body as { event?: unknown }).event ?? '') : '';
+    const response = await this.paymentService.handleProviderWebhook({
+      provider: 'paystack',
+      signature: signature ?? '',
+      event,
+      payloadJson,
+    });
+    return { message: response.message };
   }
 }
