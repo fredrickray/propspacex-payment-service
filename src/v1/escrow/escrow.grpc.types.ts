@@ -213,13 +213,13 @@ export function EscrowServiceControllerMethods() {
       'getEscrowTimeline',
     ];
     for (const method of grpcMethods) {
-      const descriptor: unknown = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
+      const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       const protoMethod = method.charAt(0).toUpperCase() + method.slice(1);
       GrpcMethod('EscrowService', protoMethod)(constructor.prototype[method], method, descriptor);
     }
     const grpcStreamMethods: string[] = [];
     for (const method of grpcStreamMethods) {
-      const descriptor: unknown = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
+      const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcStreamMethod('EscrowService', method)(constructor.prototype[method], method, descriptor);
     }
   };

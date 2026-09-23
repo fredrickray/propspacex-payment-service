@@ -9,7 +9,7 @@ export const appConfig = registerAs('app', () => ({
   name: process.env.APP_NAME,
   host: process.env.HOST || 'localhost',
   grpcPort: +(process.env.GRPC_PORT || 50053),
-  paymentServicePort: +(process.env.PAYMENT_SERVICE_PORT || 9093),
+  paymentServicePort: +(process.env.PAYMENT_SERVICE_PORT || 9096),
   environment: process.env.NODE_ENV,
   frontendBaseUrl: process.env.FRONTEND_BASE_URL,
   /** UUID of a wallet user that accrues platform_fee_minor on escrow release (optional). */

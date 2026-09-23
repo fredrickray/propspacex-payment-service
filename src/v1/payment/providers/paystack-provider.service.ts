@@ -38,7 +38,7 @@ export class PaystackProviderService implements BasePaymentProviderService {
     const response = await this.paystack.transaction.initialize({
       amount: amount.toString(),
       email,
-      currency,
+      currency: currency.toUpperCase(),
       callback_url: callbackUrl || defaultCallback,
       metadata: metadata ?? {},
     });
@@ -54,7 +54,7 @@ export class PaystackProviderService implements BasePaymentProviderService {
   }
 
   async verifyTransaction(reference: string) {
-    const response = await this.paystack.transaction.verify({ reference });
+    const response = await this.paystack.transaction.verify(reference);
     const data = response.data as
       | {
           status?: string;

@@ -6,8 +6,16 @@
  *   localhost:50053 payment.EscrowService/CreateEscrow
  *
  * grpcurl -plaintext -import-path proto -proto payment/v1/payment.proto \
- *   -d '{"escrow_id":"<escrow-uuid>","buyer_user_id":"<buyer-uuid>","amount_minor":500000,"currency_code":1,"provider":"paystack","email":"a@b.com","callback_url":"https://example.com/cb","idempotency_key":"idem-pay-1"}' \
+ *   -d '{"buyer_user_id":"<buyer-uuid>","escrow_id":"<escrow-uuid>","amount_minor":"500000","currency_code":1,"provider":"paystack","email":"a@b.com","callback_url":"https://example.com/cb","idempotency_key":"idem-pay-1","purpose":1}' \
  *   localhost:50053 payment.PaymentService/CreatePaymentIntent
+ *
+ * grpcurl -plaintext -import-path proto -proto payment/v1/payment.proto \
+ *   -d '{"user_id":"<buyer-uuid>","amount_minor":"300000","currency_code":1,"provider":"paystack","email":"a@b.com","callback_url":"https://example.com/cb","idempotency_key":"idem-topup-1"}' \
+ *   localhost:50053 payment.PaymentService/CreateWalletTopupIntent
+ *
+ * grpcurl -plaintext -import-path proto -proto payment/v1/payment.proto \
+ *   -d '{"provider":"paystack","reference":"<provider-reference>"}' \
+ *   localhost:50053 payment.PaymentService/VerifyWalletTopup
  */
 
 import { EscrowController } from '@/v1/escrow/escrow.controller';

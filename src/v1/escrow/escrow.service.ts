@@ -407,7 +407,7 @@ export class EscrowService {
           eventType: EscrowEventDbType.MARKED_COMPLETE,
           actorRole: 'agent',
           actorUserId: req.agentUserId,
-          note: req.note || null,
+          note: req.note || undefined,
         });
 
         await this.recordIdempotency(tx, IdempotencyScope.MARK_SERVICE_COMPLETE, req.idempotencyKey, req.escrowId);
@@ -496,7 +496,7 @@ export class EscrowService {
           eventType: EscrowEventDbType.RELEASED,
           actorRole: 'buyer',
           actorUserId: req.buyerUserId,
-          note: req.note || null,
+          note: req.note || undefined,
         });
 
         await this.recordIdempotency(tx, IdempotencyScope.RELEASE, req.idempotencyKey, req.escrowId);
@@ -612,7 +612,7 @@ export class EscrowService {
           eventType: EscrowEventDbType.CANCELLED,
           actorRole: role,
           actorUserId: req.cancelledByUserId,
-          note: req.reason || null,
+          note: req.reason || undefined,
         });
 
         await this.recordIdempotency(tx, IdempotencyScope.CANCEL, req.idempotencyKey, req.escrowId);
@@ -923,7 +923,7 @@ export class EscrowService {
           eventType: EscrowEventDbType.DISPUTE_RESOLVED,
           actorRole: 'admin',
           actorUserId: req.adminUserId,
-          note: req.adminNote || null,
+          note: req.adminNote || undefined,
           metadataJson: JSON.stringify({ resolution, buyerAward, agentAward }),
         });
 
