@@ -5,8 +5,19 @@ export interface BasePaymentProviderService extends OnModuleInit {
     amount: number;
     email: string;
     currency: string;
+    callbackUrl?: string;
+    metadata?: Record<string, unknown>;
   }): Promise<{
     paymentLink: string;
     reference: string;
   }>;
+
+  verifyTransaction(reference: string): Promise<{
+    status: string;
+    amountMinor: number;
+    currency: string;
+    metadata?: Record<string, unknown>;
+  }>;
+
+  verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean;
 }

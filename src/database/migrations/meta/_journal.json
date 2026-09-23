@@ -15,6 +15,20 @@
       "when": 1776248902097,
       "tag": "0001_perfect_warstar",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778031000000,
+      "tag": "0002_shiny_wallet_topups",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778140800000,
+      "tag": "0003_escrow_and_idempotency",
+      "breakpoints": true
     }
   ]
 }

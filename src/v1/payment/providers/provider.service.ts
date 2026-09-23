@@ -15,11 +15,24 @@ export class PaymentProviderService {
     return this.providers.get(provider)!;
   }
 
-  createPaymentLink(provider: PaymentProvider, data: {
-    amount: number;
-    email: string;
-    currency: string;
-  }) {
-    return this.getProvider(provider).createPaymentLink(data)
+  createPaymentLink(
+    provider: PaymentProvider,
+    data: {
+      amount: number;
+      email: string;
+      currency: string;
+      callbackUrl?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
+    return this.getProvider(provider).createPaymentLink(data);
+  }
+
+  verifyTransaction(provider: PaymentProvider, reference: string) {
+    return this.getProvider(provider).verifyTransaction(reference);
+  }
+
+  verifyWebhookSignature(provider: PaymentProvider, rawBody: string, signatureHeader: string) {
+    return this.getProvider(provider).verifyWebhookSignature(rawBody, signatureHeader);
   }
 }
