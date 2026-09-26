@@ -9,12 +9,28 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from './app.module';
 
+/** Repo checkout (`proto/`) in dev; build output (`dist/proto/`) in production. */
+function resolvePaymentProtoPath(): string {
+  const relative = join('proto', 'payment', 'v1', 'payment.proto');
+  const candidates = [
+    join(__dirname, '..', relative),
+    join(process.cwd(), relative),
+    join(process.cwd(), 'dist', relative),
+  ];
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (!found) {
+    throw new Error(`payment.proto not found. Looked in: ${candidates.join(', ')}`);
+  }
+  return found;
+}
+
 async function bootstrap() {
   const PAYMENT_PACKAGE_NAME = 'payment';
-  const PAYMENT_PROTO_PATH = join(process.cwd(), 'proto', 'payment', 'v1', 'payment.proto');
+  const PAYMENT_PROTO_PATH = resolvePaymentProtoPath();
 
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
