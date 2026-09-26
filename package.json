@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build && cp -r proto dist/proto && test -f dist/proto/payment/v1/payment.proto",
+    "build": "node scripts/ensure-proto.js && nest build && cp -r proto dist/proto && test -f dist/proto/payment/v1/payment.proto",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "dev": "nest start --watch",
     "start:dev": "ts-node -r tsconfig-paths/register src/main.ts",
